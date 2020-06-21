@@ -4,6 +4,7 @@ import logging
 import os
 import requests
 import json
+from datetime import datetime
 
 TOKEN = os.getenv('SIMPLE_PROXIES_BOT_TOKEN')
 bot = commands.Bot(command_prefix='.')
@@ -13,7 +14,7 @@ api_url = '127.0.0.1:8000/api/v1/'
 async def on_message(ctx, billing_email: str):
     author_id = ctx.message.author.id
     update_email_response = requests.put(
-        f'{api_url}users/{author_id}/billing_email', 
+        f'{api_url}users/{author_id}/billing_email/', 
         data = json.dumps({'billing_email': billing_email})
     )
     if update_email_response.status_code == 404:
@@ -41,7 +42,7 @@ async def on_message(ctx, billing_email: str):
 async def on_message(ctx, ip_address: str):
     author_id = ctx.message.author.id
     update_ip_response = requests.post(
-        f'{api_url}users/{author_id}/billing_email',
+        f'{api_url}users/{author_id}/ip/',
         data = json.dumps({'ip_address': ip_address})
     )
     if update_ip_response.status_code == 404:
@@ -53,6 +54,25 @@ async def on_message(ctx, ip_address: str):
 
     ctx.message.author.send('Successfully bound IP')
 
+@bot.command(name='overview')
+async def on_message(ctx):
+    author_id = ctx.message.author.id
+    user_info_response = requests.get(f'{api_url}users/{author_id}/')
+    if user_info_response.status_code == 404:
+        ctx.message.author.send("You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`")
+        return
+    elif user_info_response.status_code == 500:
+        ctx.message.author.send('Error fetching user. Please contact admins about this issue')
+        return
+    
+    user_info = json.loads(user_info_response.text)
 
+    ctx.message.author.send(f"""
+                            User Overview:
+                            Billing Email: {user_info['billing_email']}
+                            Bound IPs: {', '.join(user_info['binds'])}
+                            Remaining Data: {user_info['data_string']}
+                            Data Expiration: {datetime.fromtimestamp(user_info['data_expiry']).strftime("%Y-%m-%d")}
+                            """)
 
 bot.run(TOKEN)
