@@ -5,10 +5,31 @@ import os
 import requests
 import json
 from datetime import datetime
+import time
+from hashlib import sha256
+import hmac
 
 TOKEN = os.getenv('SIMPLE_PROXIES_BOT_TOKEN')
+PROXY_API_TOKEN = os.getenv('SIMPLE_PROXIES_API_TOKEN')
 bot = commands.Bot(command_prefix='.')
 api_url = '127.0.0.1:8000/api/v1/'
+
+def generate_headers(request_body = None):
+    timestamp = int(time.time())
+    if request_body == None:
+        signature = hmac.new(
+            PROXY_API_TOKEN.encode('utf-8'), 
+            msg = timestamp.encode('utf-8'), 
+            digestmod = sha256
+        ).hexdigest()
+    else:     
+        signature = hmac.new(
+            PROXY_API_TOKEN.encode('utf-8'), 
+            msg = ("%d.%s" % (timestamp, request_body)).encode('utf-8'), 
+            digestmod = sha256
+        ).hexdigest()
+
+    return {'timestamp': timestamp, 'signature': signature}
 
 @bot.command(name='setbillingemail')
 async def on_message(ctx, billing_email: str):
@@ -18,12 +39,14 @@ async def on_message(ctx, billing_email: str):
         data = json.dumps({'billing_email': billing_email})
     )
     if update_email_response.status_code == 404:
-        create_user_response = requests.post(
-            api_url + 'users/',
-            data = json.dumps({
+        data = json.dumps({
                 'discord_id': author_id,
                 'billing_email': billing_email
             })
+        create_user_response = requests.post(
+            api_url + 'users/',
+            data = data,
+            headers = generate_headers(data)
         )
         if create_user_response.status_code != 201:
             await ctx.message.author.send('Error when creating user. Error code ' + create_user_response.status_code + '. Please contact admins about this error')
@@ -41,9 +64,11 @@ async def on_message(ctx, billing_email: str):
 @bot.command(name='bindip')
 async def on_message(ctx, ip_address: str):
     author_id = ctx.message.author.id
+    data = json.dumps({'ip_address': ip_address})
     update_ip_response = requests.post(
         f'{api_url}users/{author_id}/ip/',
-        data = json.dumps({'ip_address': ip_address})
+        data = data,
+        headers = generate_headers(data)
     )
     if update_ip_response.status_code == 404:
         ctx.message.author.send("You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`")
@@ -57,7 +82,7 @@ async def on_message(ctx, ip_address: str):
 @bot.command(name='overview')
 async def on_message(ctx):
     author_id = ctx.message.author.id
-    user_info_response = requests.get(f'{api_url}users/{author_id}/')
+    user_info_response = requests.get(f'{api_url}users/{author_id}/', headers=generate_headers)
     if user_info_response.status_code == 404:
         ctx.message.author.send("You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`")
         return
@@ -78,9 +103,11 @@ async def on_message(ctx):
 @bot.command(name='purchase')
 async def on_message(ctx, data_amount: int):
     author_id = ctx.message.author.id
+    data = json.dumps({'data_amount': data_amount})
     send_invoice_response = requests.post(
         f'{api_url}users/{author_id}/sendinvoice/',
-        data = json.dumps({'data_amount': data_amount})
+        data = data,
+        headers = generate_headers(data)
     )
     if send_invoice_response.status_code == 404:
         ctx.message.author.send("You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`")
