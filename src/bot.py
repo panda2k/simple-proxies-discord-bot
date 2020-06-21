@@ -75,4 +75,24 @@ async def on_message(ctx):
                             Data Expiration: {datetime.fromtimestamp(user_info['data_expiry']).strftime("%Y-%m-%d")}
                             """)
 
+@bot.command(name='purchase')
+async def on_message(ctx, data_amount: int):
+    author_id = ctx.message.author.id
+    send_invoice_response = requests.post(
+        f'{api_url}users/{author_id}/sendinvoice/',
+        data = json.dumps({'data_amount': data_amount})
+    )
+    if send_invoice_response.status_code == 404:
+        ctx.message.author.send("You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`")
+        return
+    elif send_invoice_response.status_code == 400:
+        ctx.message.author.send("Input a valid amount of data. Must be an integer and above 0. Redo the `.purchase` command")
+        return
+    elif send_invoice_response.status_code == 500:
+        ctx.message.author.send("Error when generating stripe invoice. Contact admins")
+        return
+    
+    ctx.message.author.send("Check your billing email for a stripe invoice. Once the invoice is paid the data will be added to your account.")
+
+
 bot.run(TOKEN)
