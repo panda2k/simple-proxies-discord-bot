@@ -8,6 +8,7 @@ from datetime import datetime
 import time
 from hashlib import sha256
 import hmac
+from io import BytesIO
 
 TOKEN = os.getenv('SIMPLE_PROXIES_BOT_TOKEN')
 PROXY_API_TOKEN = os.getenv('SIMPLE_PROXIES_API_KEY')
@@ -123,5 +124,29 @@ async def on_message(ctx, data_amount: int):
     
     await ctx.message.author.send("Check your billing email for a stripe invoice. Once the invoice is paid the data will be added to your account.")
 
+@bot.command(name='generate')
+async def on_message(ctx, proxy_type: str, region: str, proxy_count: int):
+    author_id = ctx.message.author.id
+    data = json.dumps({
+        'region': region.lower(),
+        'type': proxy_type.lower(),
+        'proxy_count': proxy_count
+    })
+    create_proxies_response = requests.post(
+        f'{api_url}proxies/generate/',
+        data = data,
+        headers = generate_headers(data)
+    )
+    if create_proxies_response.status_code == 400:
+        if create_proxies_response.text != '':
+            await ctx.message.author.send(create_proxies_response.text.replace('"', ''))
+        else:
+            await ctx.message.author.send('Authentication error. Contact admins')
+        return
+    
+    proxies = json.loads(create_proxies_response.text).strip('[]').replace(' ', '').replace('"', '').replace(',', '\n')
+    proxy_file = BytesIO(proxies.encode())
+
+    await ctx.message.author.send(file = discord.File(proxy_file, filename='Proxies.txt'))
 
 bot.run(TOKEN)
