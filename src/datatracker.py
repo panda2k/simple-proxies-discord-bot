@@ -17,7 +17,6 @@ def send_to_webhook(message):
         'avatar_url': 'https://rb.gy/tkh0ob',
     })
     webhook_response = requests.post(webhook_url, data = data, headers={'Content-Type': 'application/json'})
-    print(webhook_response.text)
 
 def generate_headers(request_body = None):
     timestamp = int(time.time())
