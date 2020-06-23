@@ -99,7 +99,7 @@ async def on_message(ctx):
     if user_info['data_expiry'] == "N/A":
         user_info_string += "Data Expiration: N/A ```"
     else:
-        user_info_string += f'Data Expiration: {datetime.fromtimestamp((user_info["data_expiry"])).strftime("%Y-%m-%d")}```'
+        user_info_string += f'Data Expiration: {datetime.fromtimestamp(int(user_info["data_expiry"])).strftime("%Y-%m-%d")}```'
 
     await ctx.message.author.send(user_info_string)
 
