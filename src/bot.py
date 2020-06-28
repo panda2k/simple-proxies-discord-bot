@@ -8,11 +8,12 @@ import time
 from hashlib import sha256
 import hmac
 from io import BytesIO
+import re
 
 TOKEN = os.getenv('SIMPLE_PROXIES_BOT_TOKEN')
 PROXY_API_TOKEN = os.getenv('SIMPLE_PROXIES_API_KEY')
 client = discord.Client()
-api_url = 'http://127.0.0.1:8000/api/v1/'
+api_url = 'https://api.simpleproxies.io/api/v1/'
 command_prefix = '.'
 
 @client.event
@@ -20,8 +21,10 @@ async def on_message(message):
     if message.author == client.user or message.content.startswith(command_prefix) == False:
         return
 
+    response_message = 'Input a valid command'
     author_id = message.author.id
-    message_arguments = message.content.split('^\s+')
+    message_arguments = re.compile('\s+').split(message.content)
+    print(message_arguments)
     if message_arguments[0] == '.setbillingemail':
         response_message = set_billing_email(author_id, message_arguments[1])
     elif message_arguments[0] == '.bindip':
@@ -30,7 +33,7 @@ async def on_message(message):
         response_message = get_overview(author_id)
     elif message_arguments[0] == '.purchase':
         try:
-            response_message = purchase_data(author_id, int(message_arguments[0]))
+            response_message = purchase_data(author_id, int(message_arguments[1]))
         except ValueError:
             response_message = "Input a valid integer as the data amount"
     elif message_arguments[0] == '.generate':
@@ -38,8 +41,7 @@ async def on_message(message):
             response_message = generate_proxies(author_id, message_arguments[1], message_arguments[2], int(message_arguments[3]))
         except ValueError:
             response_message = "Input a valid integer as the proxy amount"
-    
-    message.author.send(response_message)
+    await message.author.send(response_message)
 
 
 def generate_proxies(author_id, proxy_type: str, region: str, proxy_count: int):
