@@ -24,7 +24,7 @@ async def on_message(message):
     response_message = 'Input a valid command'
     author_id = message.author.id
     message_arguments = re.compile('\s+').split(message.content)
-    print(message_arguments)
+
     if message_arguments[0] == '.setbillingemail':
         response_message = set_billing_email(author_id, message_arguments[1])
     elif message_arguments[0] == '.bindip':
@@ -39,6 +39,8 @@ async def on_message(message):
     elif message_arguments[0] == '.generate':
         try:
             response_message = generate_proxies(author_id, message_arguments[1], message_arguments[2], int(message_arguments[3]))
+            await message.author.send(file=response_message)
+            return
         except ValueError:
             response_message = "Input a valid integer as the proxy amount"
     await message.author.send(response_message)
