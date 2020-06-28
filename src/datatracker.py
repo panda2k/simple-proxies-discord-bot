@@ -39,6 +39,7 @@ def main():
     data_response = requests.get(api_url, headers = generate_headers())
     if data_response.status_code != 200:
         send_to_webhook(f'Bad response. <@{user_id}>')
+        return
     
     data = str(round(json.loads(data_response.text)['total_data'] / 1000000000, 2))
     send_to_webhook(f'Make sure you have {data}GBs of data available. <@{user_id}>')
