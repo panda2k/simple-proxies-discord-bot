@@ -29,6 +29,8 @@ async def on_message(message):
         response_message = set_billing_email(author_id, message_arguments[1])
     elif message_arguments[0] == '.bindip':
         response_message = bind_ip(author_id, message_arguments[1])
+    elif message_arguments[0] == '.unbindip':
+        response_message = bind_ip(author_id, message_arguments[1])
     elif message_arguments[0] == '.overview':
         response_message = get_overview(author_id)
     elif message_arguments[0] == '.purchase':
@@ -112,6 +114,20 @@ def set_billing_email(author_id, billing_email):
         return 'Error when updating email. Contact admins about this'
     
     return 'Successfully updated billing email'
+
+def unbind_ip(author_id, ip_address):
+    data = json.dumps({'ip_address': ip_address})
+    remove_ip_response = requests.delete(
+        f'{api_url}users/{author_id}/ip/',
+        data = data,
+        headers = generate_headers(data)
+    )
+    if remove_ip_response.status_code == 404:
+        return "You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`"
+    elif remove_ip_response.status_code == 400:
+        return "That IP address was not bound. No changes made"
+    
+    return 'Successfully unbound IP'
 
 def bind_ip(author_id, ip_address):
     data = json.dumps({'ip_address': ip_address})
