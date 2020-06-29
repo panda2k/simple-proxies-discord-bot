@@ -45,6 +45,10 @@ async def on_message(message):
             response_message = "Input a valid integer as the proxy amount"
     await message.author.send(response_message)
 
+@client.event
+async def on_member_join(member):
+    channel = client.get_channel(726876190882791594)
+    await channel.send(str(member.id) + ' just joined.')
 
 def generate_proxies(author_id, proxy_type: str, region: str, proxy_count: int):
     data = json.dumps({
