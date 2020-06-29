@@ -92,10 +92,11 @@ def purchase_data(author_id, data_amount: int):
 
 
 def set_billing_email(author_id, billing_email):
+    data = json.dumps({'billing_email': billing_email})
     update_email_response = requests.put(
         f'{api_url}users/{author_id}/billingemail/', 
-        data = json.dumps({'billing_email': billing_email}),
-        headers = generate_headers()
+        data = data,
+        headers = generate_headers(request_body = data)
     )
     if update_email_response.status_code == 404:
         data = json.dumps({
