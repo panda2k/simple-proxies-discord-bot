@@ -30,7 +30,7 @@ async def on_message(message):
     elif message_arguments[0] == '.bindip':
         response_message = bind_ip(author_id, message_arguments[1])
     elif message_arguments[0] == '.unbindip':
-        response_message = bind_ip(author_id, message_arguments[1])
+        response_message = unbind_ip(author_id, message_arguments[1])
     elif message_arguments[0] == '.overview':
         response_message = get_overview(author_id)
     elif message_arguments[0] == '.purchase':
