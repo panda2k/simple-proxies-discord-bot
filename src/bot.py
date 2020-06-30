@@ -102,17 +102,18 @@ async def purge_users(users = None):
             await bot_command_channel.send('Unknown error. ' + database_members_response.text)
             return
         
+        inactive_members = []
         database_members = json.loads(database_members_response.text) 
-        for x in range(len(discord_server_members)):
-            if str(discord_server_members[x].id) in database_members:
-                if database_members[str(discord_server_members[x].id)]['data'] != 0:
-                    discord_server_members.remove(discord_server_members[x])
+        for discord_member in discord_server_members:
+            if discord_member.id in database_members:
+                if database_members[discord_member.id]['data'] != 0:
+                    inactive_members.append(discord_member)
     else: 
         #write later
         await bot_command_channel.send('Under development')
     
-    await bot_command_channel.send(f'Finished processing users.\n{len(discord_server_members)} will be kicked.\n**LIST OF USERS TO BE KICKED**')
-    for member in discord_server_members:
+    await bot_command_channel.send(f'Finished processing users.\n{len(inactive_members)} will be kicked.\n**LIST OF USERS TO BE KICKED**')
+    for member in inactive_members:
         await bot_command_channel.send(member.display_name + ':' + str(member.id))
     
     confirmation_message = await bot_command_channel.send('React to this message with :white_check_mark: to kick these users and react with :x: to cancel operation')
