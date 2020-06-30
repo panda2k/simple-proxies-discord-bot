@@ -86,47 +86,52 @@ async def delete_previous_message(channel_id):
     await last_message.delete()
 
 async def purge_users(users = None):
+    inactive_members = []
+    bot_command_channel = client.get_channel(admin_bot_commands_id)
+
     database_members_response = requests.get(api_url + 'users/', headers = generate_headers())
+    if database_members_response.status_code == 400:
+        await bot_command_channel.send('Authentication error')
+        return
+    elif database_members_response.status_code == 500:
+        await bot_command_channel.send('Error fetching users. Traceback: ' + database_members_response.text)
+        return
+    elif database_members_response.status_code != 200:
+        await bot_command_channel.send('Unknown error. ' + database_members_response.text)
+        return
+
+    database_members = json.loads(database_members_response.text) 
 
     if users == None:
-        discord_server_members = client.get_guild(id = server_id).get_role(role_id = member_role_id).members # becomes the list of users to be kicked
-
-        bot_command_channel = client.get_channel(admin_bot_commands_id)
-        if database_members_response.status_code == 400:
-            await bot_command_channel.send('Authentication error')
-            return
-        elif database_members_response.status_code == 500:
-            await bot_command_channel.send('Error fetching users. Traceback: ' + database_members_response.text)
-            return
-        elif database_members_response.status_code != 200:
-            await bot_command_channel.send('Unknown error. ' + database_members_response.text)
-            return
-        
-        inactive_members = []
-        database_members = json.loads(database_members_response.text) 
-        for discord_member in discord_server_members:
-            if discord_member.id in database_members:
-                if database_members[discord_member.id]['data'] != 0:
-                    inactive_members.append(discord_member)
-    else: 
-        #write later
-        await bot_command_channel.send('Under development')
+        discord_server_members = client.get_guild(id = server_id).get_role(role_id = member_role_id).members 
+    else:
+        users_list = users.split(',') 
+        for user in users_list:
+            discord_server_members = client.get_user(user)
+    
+    # process users
+    for discord_member in discord_server_members:
+        if str(discord_member.id) in database_members:
+            if database_members[str(discord_member.id)]['data'] == "0":
+                inactive_members.append(discord_member)
+        else:
+            inactive_members.append(discord_member)
     
     await bot_command_channel.send(f'Finished processing users.\n{len(inactive_members)} will be kicked.\n**LIST OF USERS TO BE KICKED**')
     for member in inactive_members:
         await bot_command_channel.send(member.display_name + ':' + str(member.id))
     
     confirmation_message = await bot_command_channel.send('React to this message with :white_check_mark: to kick these users and react with :x: to cancel operation')
-    await confirmation_message.add_reaction(':white_check_mark:')
-    await confirmation_message.add_reaction(':x:')
+    await confirmation_message.add_reaction('\U00002714')
+    await confirmation_message.add_reaction('\U0000274C')
 
     def check_reaction(reaction, user):
         if user == admin_id:
-            if str(reaction.emoji) == ':white_check_mark:':
+            if str(reaction.emoji) == '\U00002714':
                 return True
-            elif str(reaction.emoji) == ':x:':
+            elif str(reaction.emoji) == '\U0000274C':
                 return False
-    
+
     try:
         execute_delete = await client.wait_for('reaction_add', timeout = 60.0, check = check_reaction)
     except asyncio.TimeoutError:
