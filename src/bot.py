@@ -21,6 +21,7 @@ member_join_log_id = 726876190882791594
 admin_bot_commands_id = 727295549505798234
 member_role_id = 723732422830850090
 admin_id = 221682464291160067
+server_id = 723013366037348412
 
 @client.event
 async def on_message(message):
@@ -69,7 +70,7 @@ async def on_message(message):
         elif message_arguments[0] == '.purge':
             try:
                 await purge_users(message_arguments[1])
-            except KeyError:
+            except IndexError:
                 await purge_users()
 
     await message.author.send(response_message)
@@ -88,7 +89,7 @@ async def purge_users(users = None):
     database_members_response = requests.get(api_url + 'users/', headers = generate_headers())
 
     if users == None:
-        discord_server_members = discord.Role(id = 723732422830850090).members # becomes the list of users to be kicked
+        discord_server_members = client.get_guild(id = server_id).get_role(role_id = member_role_id).members # becomes the list of users to be kicked
 
         bot_command_channel = client.get_channel(admin_bot_commands_id)
         if database_members_response.status_code == 400:
@@ -96,19 +97,23 @@ async def purge_users(users = None):
             return
         elif database_members_response.status_code == 500:
             await bot_command_channel.send('Error fetching users. Traceback: ' + database_members_response.text)
+            return
+        elif database_members_response.status_code != 200:
+            await bot_command_channel.send('Unknown error. ' + database_members_response.text)
+            return
         
         database_members = json.loads(database_members_response.text) 
-        for discord_member in discord_server_members:
-            if discord_member.id in database_members:
-                if database_members[discord_member.id]['data'] != 0:
-                    discord_server_members.remove(discord_member)
+        for x in range(len(discord_server_members)):
+            if str(discord_server_members[x].id) in database_members:
+                if database_members[str(discord_server_members[x].id)]['data'] != 0:
+                    discord_server_members.remove(discord_server_members[x])
     else: 
         #write later
         await bot_command_channel.send('Under development')
     
     await bot_command_channel.send(f'Finished processing users.\n{len(discord_server_members)} will be kicked.\n**LIST OF USERS TO BE KICKED**')
     for member in discord_server_members:
-        await bot_command_channel.send(member.display_name + ':' + member.id)
+        await bot_command_channel.send(member.display_name + ':' + str(member.id))
     
     confirmation_message = await bot_command_channel.send('React to this message with :white_check_mark: to kick these users and react with :x: to cancel operation')
     await confirmation_message.add_reaction(':white_check_mark:')
