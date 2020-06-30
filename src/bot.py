@@ -15,6 +15,9 @@ PROXY_API_TOKEN = os.getenv('SIMPLE_PROXIES_API_KEY')
 client = discord.Client()
 api_url = 'https://api.simpleproxies.io/api/v1/'
 command_prefix = '.'
+bot_status_channel_id = 727293181841899541
+member_join_log_id = 726876190882791594
+admin_bot_commands_id = 727295549505798234
 
 @client.event
 async def on_message(message):
@@ -45,12 +48,46 @@ async def on_message(message):
             return
         except ValueError:
             response_message = "Input a valid integer as the proxy amount"
+    elif message_arguments[0] == '.status' and message.channel.id == admin_bot_commands_id:
+        if message_arguments[1] == 'True':
+            status = True
+        elif message_arguments[1] == 'False':
+            status = False
+        else:
+            response_message = 'Input a valid status'
+            await message.channel.send(response_message)
+            return
+
+        await delete_previous_message(bot_status_channel_id)
+        await send_bot_status(status)
+        await message.channel.send('Successfully changed status')
+        return
+
     await message.author.send(response_message)
 
 @client.event
 async def on_member_join(member):
-    channel = client.get_channel(726876190882791594)
+    channel = client.get_channel(member_join_log_id)
     await channel.send(str(member.id) + ' just joined.')
+
+async def delete_previous_message(channel_id):
+    channel = client.get_channel(channel_id)
+    last_message = await channel.fetch_message(channel.last_message_id)
+    await last_message.delete()
+
+async def send_bot_status(bot_status):
+    channel = client.get_channel(bot_status_channel_id)
+    status_embed = discord.Embed(
+        title = 'Simple Proxies Bot Status',
+        description = "View this message to see if the bot is operational. Although the bot is online, it might be undergoing maintenance. If the bot is ever giving errors, check here to make sure the bot isn't under maintenance.", 
+    )
+    if bot_status == True:
+        status_embed.description += "\n\n**BOT STATUS**: :white_check_mark:"
+        status_embed.colour = int('5dcf48', 16)
+    elif bot_status == False:
+        status_embed.description += "\n\n**BOT STATUS**: :x:"
+        status_embed.colour = int('cf4d48', 16)
+    await channel.send(embed = status_embed)
 
 def generate_proxies(author_id, proxy_type: str, region: str, proxy_count: int):
     data = json.dumps({
