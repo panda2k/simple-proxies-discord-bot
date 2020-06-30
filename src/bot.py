@@ -62,7 +62,6 @@ async def on_message(message):
                 response_message = 'Input a valid status'
                 await message.channel.send(response_message)
                 return
-
             await delete_previous_message(bot_status_channel_id)
             await send_bot_status(status)
             await message.channel.send('Successfully changed status')
@@ -141,6 +140,18 @@ async def purge_users(users = None):
             if reaction.count > 1:
                 if str(reaction.emoji) == '\U00002705':
                     await bot_command_channel.send('Executing purge')
+                    for member in inactive_members:
+                        delete_member_response = requests.delete(f'{api_url}users/{member.id}/')
+                        if delete_member_response.status_code == 400:
+                            await bot_command_channel.send('Failed to authenticate to delete ' + member.id)
+                        elif delete_member_response.status_code == 404:
+                            await bot_command_channel.send('Failed to delete ' + member.id)
+                        elif delete_member_response.status_code == 500:
+                            await bot_command_channel.send('Failed to delete ' + member.id + f'\n{delete_member_response.text}')
+                        elif delete_member_response.status_code == 200:
+                            await member.send("You are being kicked from the Simple Proxies Discord server because you don't have an active plan. If you think this was done incorrectly, DM panda2k#5856")  
+                            await member.kick()
+                            await bot_command_channel.send('Finished kicking and removing ' + member.id + ' from the server and database.')                          
                 elif str(reaction.emoji) == '\U0000274C':
                     await bot_command_channel.send('Cancelling purge')
 
