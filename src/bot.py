@@ -9,6 +9,7 @@ from hashlib import sha256
 import hmac
 from io import BytesIO
 import re
+import asyncio
 
 TOKEN = os.getenv('SIMPLE_PROXIES_BOT_TOKEN')
 PROXY_API_TOKEN = os.getenv('SIMPLE_PROXIES_API_KEY')
@@ -18,6 +19,8 @@ command_prefix = '.'
 bot_status_channel_id = 727293181841899541
 member_join_log_id = 726876190882791594
 admin_bot_commands_id = 727295549505798234
+member_role_id = 723732422830850090
+admin_id = 221682464291160067
 
 @client.event
 async def on_message(message):
@@ -48,20 +51,26 @@ async def on_message(message):
             return
         except ValueError:
             response_message = "Input a valid integer as the proxy amount"
-    elif message_arguments[0] == '.status' and message.channel.id == admin_bot_commands_id:
-        if message_arguments[1] == 'True':
-            status = True
-        elif message_arguments[1] == 'False':
-            status = False
-        else:
-            response_message = 'Input a valid status'
-            await message.channel.send(response_message)
-            return
+    elif message.channel.id == admin_bot_commands_id:
+        if message_arguments[0] == '.status':
+            if message_arguments[1] == 'True':
+                status = True
+            elif message_arguments[1] == 'False':
+                status = False
+            else:
+                response_message = 'Input a valid status'
+                await message.channel.send(response_message)
+                return
 
-        await delete_previous_message(bot_status_channel_id)
-        await send_bot_status(status)
-        await message.channel.send('Successfully changed status')
-        return
+            await delete_previous_message(bot_status_channel_id)
+            await send_bot_status(status)
+            await message.channel.send('Successfully changed status')
+            return
+        elif message_arguments[0] == '.purge':
+            try:
+                await purge_users(message_arguments[1])
+            except KeyError:
+                await purge_users()
 
     await message.author.send(response_message)
 
@@ -74,6 +83,53 @@ async def delete_previous_message(channel_id):
     channel = client.get_channel(channel_id)
     last_message = await channel.fetch_message(channel.last_message_id)
     await last_message.delete()
+
+async def purge_users(users = None):
+    database_members_response = requests.get(api_url + 'users/', headers = generate_headers())
+
+    if users == None:
+        discord_server_members = discord.Role(id = 723732422830850090).members # becomes the list of users to be kicked
+
+        bot_command_channel = client.get_channel(admin_bot_commands_id)
+        if database_members_response.status_code == 400:
+            await bot_command_channel.send('Authentication error')
+            return
+        elif database_members_response.status_code == 500:
+            await bot_command_channel.send('Error fetching users. Traceback: ' + database_members_response.text)
+        
+        database_members = json.loads(database_members_response.text) 
+        for discord_member in discord_server_members:
+            if discord_member.id in database_members:
+                if database_members[discord_member.id]['data'] != 0:
+                    discord_server_members.remove(discord_member)
+    else: 
+        #write later
+        await bot_command_channel.send('Under development')
+    
+    await bot_command_channel.send(f'Finished processing users.\n{len(discord_server_members)} will be kicked.\n**LIST OF USERS TO BE KICKED**')
+    for member in discord_server_members:
+        await bot_command_channel.send(member.display_name + ':' + member.id)
+    
+    confirmation_message = await bot_command_channel.send('React to this message with :white_check_mark: to kick these users and react with :x: to cancel operation')
+    await confirmation_message.add_reaction(':white_check_mark:')
+    await confirmation_message.add_reaction(':x:')
+
+    def check_reaction(reaction, user):
+        if user == admin_id:
+            if str(reaction.emoji) == ':white_check_mark:':
+                return True
+            elif str(reaction.emoji) == ':x:':
+                return False
+    
+    try:
+        execute_delete = await client.wait_for('reaction_add', timeout = 60.0, check = check_reaction)
+    except asyncio.TimeoutError:
+        await bot_command_channel.send('Command timed out. Rerun if needed')
+    else:
+        if execute_delete:
+            await bot_command_channel.send('Executing purge')
+        else:
+            await bot_command_channel.send('Cancelling purge')
 
 async def send_bot_status(bot_status):
     channel = client.get_channel(bot_status_channel_id)
