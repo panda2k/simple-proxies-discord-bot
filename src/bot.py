@@ -69,7 +69,7 @@ async def on_message(message):
             return
         elif message_arguments[0] == '.purge':
             try:
-                await purge_users(message_arguments[1])
+                await purge_users(users = message_arguments[1])
             except IndexError:
                 await purge_users()
             return
@@ -106,9 +106,12 @@ async def purge_users(users = None):
     if users == None:
         discord_server_members = client.get_guild(id = server_id).get_role(role_id = member_role_id).members 
     else:
+        discord_server_members = []
         users_list = users.split(',') 
         for user in users_list:
-            discord_server_members = client.get_user(user)
+            server_member = client.get_user(user)
+            if server_member != None:
+                discord_server_members.append(client.get_user(user))
     
     # process users
     for discord_member in discord_server_members:
