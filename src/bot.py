@@ -131,7 +131,7 @@ async def purge_users(users = None):
     try:
         reaction, user = await client.wait_for('reaction_add', 
                                                 timeout = 60.0, 
-                                                check = lambda reaction, user: str(reaction.emoji) == '\U00002705' or str(reaction.emoji) == '\U0000274C')
+                                                check = lambda reaction, user: (str(reaction.emoji) == '\U00002705' or str(reaction.emoji) == '\U0000274C') and user.id != client.user.id)
     except asyncio.TimeoutError:
         await bot_command_channel.send('Command timed out. Rerun if needed')
     else:
