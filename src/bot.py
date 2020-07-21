@@ -229,7 +229,7 @@ def set_billing_email(author_id, billing_email):
             return'Error when creating user. Error code ' + str(create_user_response.status_code) + '. Please contact admins about this error'
     elif update_email_response.status_code == 400:
         return 'Please input a valid email. Retry the `.setbillingemail` command'
-    elif update_email_response == 500:
+    elif update_email_response.status_code == 500:
         return 'Error when updating email. Contact admins about this'
     
     return 'Successfully updated billing email'
