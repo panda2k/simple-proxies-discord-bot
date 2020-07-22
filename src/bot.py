@@ -192,9 +192,12 @@ def generate_proxies(author_id, proxy_type: str, region: str, proxy_count: int):
     return discord.File(proxy_file, filename='Proxies.txt')
 
 def purchase_data(author_id, data_amount: int):
-    data = json.dumps({'data_amount': data_amount})
+    data = json.dumps({
+        'data_amount': data_amount,
+        'delivery_method': 'mail'
+    })
     send_invoice_response = requests.post(
-        f'{api_url}users/{author_id}/sendinvoice/',
+        f'{api_url}users/{author_id}/invoice/',
         data = data,
         headers = generate_headers(data)
     )
