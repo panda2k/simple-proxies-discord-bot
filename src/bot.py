@@ -228,7 +228,7 @@ def set_billing_email(author_id, billing_email):
             data = data,
             headers = generate_headers(data)
         )
-        if create_user_response.status_code != 201:
+        if create_user_response.status_code != 200:
             return'Error when creating user. Error code ' + str(create_user_response.status_code) + '. Please contact admins about this error'
     elif update_email_response.status_code == 400:
         return 'Please input a valid email. Retry the `.setbillingemail` command'
