@@ -119,7 +119,8 @@ async def purge_users(users = None):
                 inactive_members.append(discord_member)
         else:
             inactive_members.append(discord_member)
-    
+    for discord_id in discord_server_members['error_users']:
+        await bot_command_channel.send(f'Failed to fetch {discord_id}')
     await bot_command_channel.send(f'Finished processing users.\n{len(inactive_members)} will be kicked.\n**LIST OF USERS TO BE KICKED**')
     for member in inactive_members:
         await bot_command_channel.send(member.display_name + ':' + str(member.id))
