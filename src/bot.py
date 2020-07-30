@@ -90,7 +90,7 @@ async def purge_users(users = None):
     bot_command_channel = client.get_channel(admin_bot_commands_id)
 
     database_members_response = requests.get(api_url + 'users/', headers = generate_headers())
-    if database_members_response.status_code == 400:
+    if database_members_response.status_code == 401:
         await bot_command_channel.send('Authentication error')
         return
     elif database_members_response.status_code == 500:
@@ -143,7 +143,7 @@ async def purge_users(users = None):
                     await bot_command_channel.send('Executing purge')
                     for member in inactive_members:
                         delete_member_response = requests.delete(f'{api_url}users/{member.id}/')
-                        if delete_member_response.status_code == 400:
+                        if delete_member_response.status_code == 401:
                             await bot_command_channel.send('Failed to authenticate to delete ' + member.id)
                         elif delete_member_response.status_code == 404:
                             await bot_command_channel.send('Failed to delete ' + member.id)
@@ -182,9 +182,8 @@ def generate_proxies(author_id, proxy_type: str, region: str, proxy_count: int):
         headers = generate_headers(data)
     )
     if create_proxies_response.status_code == 400:
-        if create_proxies_response.text != '':
-            return create_proxies_response.text.replace('"', '')
-        else:
+        return create_proxies_response.text.replace('"', '')
+    elif create_proxies_response.status_code == 401:
             return 'Authentication error. Contact admins'
     
     proxies = json.loads(create_proxies_response.text).strip('[]').replace(' ', '').replace('"', '').replace(',', '\n')
@@ -206,6 +205,8 @@ def purchase_data(author_id, data_amount: int):
         return "You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`"
     elif send_invoice_response.status_code == 400:
         return "Input a valid amount of data. Must be an integer and above 0. Redo the `.purchase` command"
+    elif send_invoice_response.status_code == 401:
+        return "Failed to authenticate. Contact admins"
     elif send_invoice_response.status_code == 500:
         return "Error when generating stripe invoice. Contact admins"
     
@@ -231,6 +232,8 @@ def set_billing_email(author_id, billing_email):
         )
         if create_user_response.status_code != 200:
             return'Error when creating user. Error code ' + str(create_user_response.status_code) + '. Please contact admins about this error'
+    elif update_email_response.status_code == 401:
+        return "Failed to authenticate. Contact admins"
     elif update_email_response.status_code == 400:
         return 'Please input a valid email. Retry the `.setbillingemail` command'
     elif update_email_response.status_code == 500:
@@ -249,6 +252,8 @@ def unbind_ip(author_id, ip_address):
         return "You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`"
     elif remove_ip_response.status_code == 400:
         return "That IP address was not bound. No changes made"
+    elif remove_ip_response.status_code == 401:
+        return "Failed to authenticate. Contact admins"
     
     return 'Successfully unbound IP'
 
@@ -263,6 +268,8 @@ def bind_ip(author_id, ip_address):
         return "You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`"
     elif update_ip_response.status_code == 400:
         return 'Please input a valid IP address. Make sure this is an IPV4 address. Retry the `.bindip` command'
+    elif update_ip_response.status_code == 401:
+        return "Failed to authenticate. Contact admins"
 
     return 'Successfully bound IP'
 
