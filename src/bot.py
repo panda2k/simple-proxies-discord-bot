@@ -82,8 +82,11 @@ async def on_member_join(member):
 
 async def delete_previous_message(channel_id):
     channel = client.get_channel(channel_id)
-    last_message = await channel.fetch_message(channel.last_message_id)
-    await last_message.delete()
+    try:
+        last_message = await channel.fetch_message(channel.last_message_id)
+        await last_message.delete()
+    except discord.errors.NotFound:
+        return
 
 async def purge_users(users = None):
     inactive_members = []
