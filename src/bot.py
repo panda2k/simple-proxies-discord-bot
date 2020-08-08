@@ -145,17 +145,17 @@ async def purge_users(users = None):
                 if str(reaction.emoji) == '\U00002705':
                     await bot_command_channel.send('Executing purge')
                     for member in inactive_members:
-                        delete_member_response = requests.delete(f'{api_url}users/{member.id}/')
+                        delete_member_response = requests.delete(f'{api_url}users/{str(member.id)}/', headers= generate_headers())
                         if delete_member_response.status_code == 401:
-                            await bot_command_channel.send('Failed to authenticate to delete ' + member.id)
-                        elif delete_member_response.status_code == 404:
-                            await bot_command_channel.send('Failed to delete ' + member.id)
+                            await bot_command_channel.send('Failed to authenticate to delete ' + str(member.id))
                         elif delete_member_response.status_code == 500:
-                            await bot_command_channel.send('Failed to delete ' + member.id + f'\n{delete_member_response.text}')
-                        elif delete_member_response.status_code == 200:
-                            await member.send("You are being kicked from the Simple Proxies Discord server because you don't have an active plan. If you think this was done incorrectly, DM panda2k#5856")  
+                            await bot_command_channel.send('Failed to delete ' + str(member.id) + f'\n{delete_member_response.text}')
+                        elif delete_member_response.status_code == 200 or delete_member_response.status_code == 404:
+                            await member.send("You are being kicked from the Simple Proxies Discord server because you don't have an active plan. If you think this was done incorrectly, DM panda2k#5856. The purge isn't super strict so if you forgot to buy a plan, DM panda2k#5856")  
                             await member.kick()
-                            await bot_command_channel.send('Finished kicking and removing ' + member.id + ' from the server and database.')                          
+                            await bot_command_channel.send('Finished kicking and removing ' + str(member.id) + ' from the server and database.')   
+                        else:
+                            await bot_command_channel.send('Unknown response. Code: ' + str(delete_member_response.status_code))                       
                 elif str(reaction.emoji) == '\U0000274C':
                     await bot_command_channel.send('Cancelling purge')
 
