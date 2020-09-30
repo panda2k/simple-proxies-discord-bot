@@ -1,7 +1,6 @@
-import discord
-import logging
+# base packages
+from concurrent.futures import process
 import os
-import requests
 import json
 from datetime import datetime
 import time
@@ -11,48 +10,73 @@ from io import BytesIO
 import re
 import asyncio
 
-TOKEN = os.getenv('SIMPLE_PROXIES_BOT_TOKEN')
-PROXY_API_TOKEN = os.getenv('SIMPLE_PROXIES_API_KEY')
+# installed packages
+import discord
+import requests
+
+# custom packages
+import simpleproxies
+
+# configure packages
+DISCORD_TOKEN = os.getenv('SIMPLE_PROXIES_BOT_TOKEN')
+simpleproxies.API_KEY = os.getenv('SIMPLE_PROXIES_API_KEY')
+simpleproxies.BASE_API_URL = 'https://api.simpleproxies.io/api/v1'
+
+# static variables
+COMMAND_PREFIX = '.'
+BOT_STATUS_CHANNEL_ID = 727293181841899541
+MEMBER_JOIN_LOG_ID = 726876190882791594
+ADMIN_BOT_COMMANDS_ID = 727295549505798234
+MEMBER_ROLE_ID = 723732422830850090
+ADMIN_ID = 221682464291160067
+SERVER_ID = 723013366037348412
+
 client = discord.Client()
-api_url = 'https://api.simpleproxies.io/api/v1/'
-command_prefix = '.'
-bot_status_channel_id = 727293181841899541
-member_join_log_id = 726876190882791594
-admin_bot_commands_id = 727295549505798234
-member_role_id = 723732422830850090
-admin_id = 221682464291160067
-server_id = 723013366037348412
 
 @client.event
 async def on_message(message):
-    if message.author == client.user or message.content.startswith(command_prefix) == False:
+    if message.author == client.user or not message.content.startswith(COMMAND_PREFIX):
         return
 
     response_message = 'Input a valid command'
     author_id = message.author.id
-    message_arguments = re.compile('\s+').split(message.content)
+    message_arguments = re.compile('\s+').split(message.content.strip()) # split by all white space
 
     if message_arguments[0] == '.setbillingemail':
-        response_message = set_billing_email(author_id, message_arguments[1])
+        response_message = set_billing_email(author_id, billing_email = message_arguments[1])
     elif message_arguments[0] == '.bindip':
-        response_message = bind_ip(author_id, message_arguments[1])
+        response_message = bind_ip(author_id, ip_address = message_arguments[1])
     elif message_arguments[0] == '.unbindip':
-        response_message = unbind_ip(author_id, message_arguments[1])
+        response_message = unbind_ip(author_id, ip_address = message_arguments[1])
     elif message_arguments[0] == '.overview':
         response_message = get_overview(author_id)
     elif message_arguments[0] == '.purchase':
         try:
-            response_message = purchase_data(author_id, int(message_arguments[1]))
+            response_message = purchase_data(author_id, plan_name = message_arguments[1], data_amount = int(message_arguments[2]))
+        except IndexError:
+            response_message = 'You are missing some message arguments. The proper format is `.purchase proxy_plan data_amount`'
         except ValueError:
             response_message = "Input a valid integer as the data amount"
     elif message_arguments[0] == '.generate':
         try:
-            response_message = generate_proxies(author_id, message_arguments[1], message_arguments[2], int(message_arguments[3]))
-            await message.author.send(file=response_message)
-            return
+            response_message = generate_proxies(
+                author_id = author_id, 
+                proxy_pool = message_arguments[1], 
+                proxy_type = message_arguments[2], 
+                region = message_arguments[3], 
+                proxy_count = int(message_arguments[4])
+            )
+            try:
+                await message.author.send(file=response_message)
+            except discord.errors.InvalidArgument:
+                await message.author.send(response_message)
+            finally:
+                return
+        except IndexError:
+            response_message = 'You are missing some message arguments. The proper format is `.generate proxy_pool proxy_type, region, proxy_count`'
         except ValueError:
-            response_message = "Input a valid integer as the proxy amount"
-    elif message.channel.id == admin_bot_commands_id:
+            response_message = "Input a valid integer as the proxy amount. The proper format is `.generate proxy_pool proxy_type, region, proxy_count`"
+    elif message.channel.id == ADMIN_BOT_COMMANDS_ID:
         if message_arguments[0] == '.status':
             if message_arguments[1] == 'True':
                 status = True
@@ -62,7 +86,7 @@ async def on_message(message):
                 response_message = 'Input a valid status'
                 await message.channel.send(response_message)
                 return
-            await delete_previous_message(bot_status_channel_id)
+            await delete_previous_message(BOT_STATUS_CHANNEL_ID)
             await send_bot_status(status)
             await message.channel.send('Successfully changed status')
             return
@@ -75,9 +99,91 @@ async def on_message(message):
 
     await message.author.send(response_message)
 
+# USER COMMANDS
+def generate_proxies(author_id: int, proxy_pool: str, proxy_type: str, region: str, proxy_count: int):
+    create_proxies_response = simpleproxies.generate_proxies(author_id, proxy_pool, proxy_type, region, proxy_count)
+    
+    if create_proxies_response.status_code != 200:
+        return process_bad_response(create_proxies_response)
+
+    proxies = '\n'.join(json.loads(create_proxies_response.text)['proxies'])
+    proxy_file = BytesIO(proxies.encode())
+
+    return discord.File(proxy_file, filename='Proxies.txt')
+
+def purchase_data(author_id: int, plan_name: str, data_amount: int):
+    send_invoice_response = simpleproxies.email_invoice(author_id, data_amount, plan_name)
+    if send_invoice_response.status_code != 200:
+        return process_bad_response(send_invoice_response)
+    
+    return "Check your billing email for a stripe invoice. Once the invoice is paid the data will be added to your account."
+
+
+def set_billing_email(author_id: int, billing_email: str):
+    update_email_response = simpleproxies.set_billing_email(author_id, billing_email)
+    if update_email_response.status_code == 404:
+        create_user_response = simpleproxies.create_user(author_id, billing_email)
+
+        if create_user_response.status_code != 200:
+            return process_bad_response(create_user_response)
+    elif update_email_response.status_code == 502:
+        return '502 bad gateway. This normally means the billing email you inputted is invalid. If this issue persists, contact admins'
+    elif update_email_response.status_code != 200:
+        return process_bad_response(update_email_response)
+    
+    return 'Successfully updated billing email'
+
+def unbind_ip(author_id: int, ip_address: str):
+    remove_ip_response = simpleproxies.unbind_ip(author_id, ip_address)
+
+    if remove_ip_response.status_code != 200:
+        return process_bad_response(remove_ip_response)
+    
+    return 'Successfully unbound IP'
+
+def bind_ip(author_id: int, ip_address: str):
+    update_ip_response = simpleproxies.bind_ip(author_id, ip_address)
+
+    if update_ip_response.status_code != 200:
+        return process_bad_response(update_ip_response)
+
+    return 'Successfully bound IP'
+
+def get_overview(author_id: int):
+    user_info_response = simpleproxies.get_user_overview(author_id)
+    if user_info_response.status_code != 200:
+        return process_bad_response(user_info_response)
+    
+    user_info = json.loads(user_info_response.text)
+    user_info_string = "```User Overview:\n" \
+                        f"Billing Email: {user_info['billing_email']}\n\n" \
+                        f"Premium Plan Info\n" \
+                        f"Bound IPs: {', '.join(user_info['binds'])}\n" \
+                        f"Remaining Data: {user_info['proxiware_data_string']}\n" \
+                        "Expiry Date: PREMIUM_EXPIRY\n\n" \
+                        f"Star Plan Info\n" \
+                        f"Data Remaining: {user_info['oxylabs_data_string']}\n" \
+                        "Expiry Date: STAR_EXPIRY```"
+    if user_info['proxiware_data_expiry']:
+        user_info_string = user_info_string.replace('PREMIUM_EXPIRY', datetime.fromtimestamp(int(user_info["proxiware_data_expiry"])).strftime("%Y-%m-%d"))
+    else:
+        user_info_string.replace('PREMIUM_EXPIRY', 'N/A')
+    
+    if user_info['oxylabs_data_expiry']:
+        user_info_string = user_info_string.replace('STAR_EXPIRY', user_info['oxylabs_data_expiry'])
+    else:
+        user_info_string.replace('STAR_EXPIRY', 'N/A')
+
+    return user_info_string
+
+# ADMIN METHODS TODO FIX PURGE USERS
+@client.event
+async def on_ready():
+    print('Bot started')
+
 @client.event
 async def on_member_join(member):
-    channel = client.get_channel(member_join_log_id)
+    channel = client.get_channel(MEMBER_JOIN_LOG_ID)
     await channel.send(str(member.id) + ' just joined.')
 
 async def delete_previous_message(channel_id):
@@ -90,7 +196,7 @@ async def delete_previous_message(channel_id):
 
 async def purge_users(users = None):
     inactive_members = []
-    bot_command_channel = client.get_channel(admin_bot_commands_id)
+    bot_command_channel = client.get_channel(ADMIN_BOT_COMMANDS_ID)
 
     database_members_response = requests.get(api_url + 'users/', headers = generate_headers())
     if database_members_response.status_code == 401:
@@ -106,7 +212,7 @@ async def purge_users(users = None):
     database_members = json.loads(database_members_response.text) 
 
     if users == None:
-        discord_server_members = client.get_guild(id = server_id).get_role(role_id = member_role_id).members 
+        discord_server_members = client.get_guild(id = SERVER_ID).get_role(role_id = MEMBER_ROLE_ID).members 
     else:
         discord_server_members = []
         users_list = users.split(',') 
@@ -160,7 +266,7 @@ async def purge_users(users = None):
                     await bot_command_channel.send('Cancelling purge')
 
 async def send_bot_status(bot_status):
-    channel = client.get_channel(bot_status_channel_id)
+    channel = client.get_channel(BOT_STATUS_CHANNEL_ID)
     status_embed = discord.Embed(
         title = 'Simple Proxies Bot Status',
         description = "View this message to see if the bot is operational. Although the bot is online, it might be undergoing maintenance. If the bot is ever giving errors, check here to make sure the bot isn't under maintenance.", 
@@ -173,143 +279,18 @@ async def send_bot_status(bot_status):
         status_embed.colour = int('cf4d48', 16)
     await channel.send(embed = status_embed)
 
-def generate_proxies(author_id, proxy_type: str, region: str, proxy_count: int):
-    data = json.dumps({
-        'region': region.lower(),
-        'type': proxy_type.lower(),
-        'proxy_count': proxy_count
-    })
-    create_proxies_response = requests.post(
-        f'{api_url}proxies/generate/',
-        data = data,
-        headers = generate_headers(data)
-    )
-    if create_proxies_response.status_code == 400:
-        return create_proxies_response.text.replace('"', '')
-    elif create_proxies_response.status_code == 401:
-            return 'Authentication error. Contact admins'
-    
-    proxies = json.loads(create_proxies_response.text).strip('[]').replace(' ', '').replace('"', '').replace(',', '\n')
-    proxy_file = BytesIO(proxies.encode())
+# HELPER FUNCTIONS
+def process_bad_response(response):
+    print(response.status_code)
+    if response.status_code == 400:
+        return 'Error code 400. {}'.format(response.text)
+    elif response.status_code == 401:
+        return 'Authentication error. Contact admins'
+    elif response.status_code == 404:
+        return 'No user account found. Please set your billing email with .setbillingemail'
+    elif response.status_code == 500:
+        return 'Fatal error. Contact admins'
+    elif response.status_code == 502:
+        return 'Bad gateway. Try again. If issue persists, contact admins'
 
-    return discord.File(proxy_file, filename='Proxies.txt')
-
-def purchase_data(author_id, data_amount: int):
-    data = json.dumps({
-        'data_amount': data_amount,
-        'delivery_method': 'mail'
-    })
-    send_invoice_response = requests.post(
-        f'{api_url}users/{author_id}/invoice/',
-        data = data,
-        headers = generate_headers(data)
-    )
-    if send_invoice_response.status_code == 404:
-        return "You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`"
-    elif send_invoice_response.status_code == 400:
-        return "Input a valid amount of data. Must be an integer and above 0. Redo the `.purchase` command"
-    elif send_invoice_response.status_code == 401:
-        return "Failed to authenticate. Contact admins"
-    elif send_invoice_response.status_code == 500:
-        return "Error when generating stripe invoice. Contact admins"
-    
-    return "Check your billing email for a stripe invoice. Once the invoice is paid the data will be added to your account."
-
-
-def set_billing_email(author_id, billing_email):
-    data = json.dumps({'billing_email': billing_email})
-    update_email_response = requests.put(
-        f'{api_url}users/{author_id}/billingemail/', 
-        data = data,
-        headers = generate_headers(request_body = data)
-    )
-    if update_email_response.status_code == 404:
-        data = json.dumps({
-                'discord_id': author_id,
-                'billing_email': billing_email
-            })
-        create_user_response = requests.post(
-            api_url + 'users/',
-            data = data,
-            headers = generate_headers(data)
-        )
-        if create_user_response.status_code != 200:
-            return'Error when creating user. Error code ' + str(create_user_response.status_code) + '. Please contact admins about this error'
-    elif update_email_response.status_code == 401:
-        return "Failed to authenticate. Contact admins"
-    elif update_email_response.status_code == 400:
-        return 'Please input a valid email. Retry the `.setbillingemail` command'
-    elif update_email_response.status_code == 500:
-        return 'Error when updating email. Contact admins about this'
-    
-    return 'Successfully updated billing email'
-
-def unbind_ip(author_id, ip_address):
-    data = json.dumps({'ip_address': ip_address})
-    remove_ip_response = requests.delete(
-        f'{api_url}users/{author_id}/ip/',
-        data = data,
-        headers = generate_headers(data)
-    )
-    if remove_ip_response.status_code == 404:
-        return "You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`"
-    elif remove_ip_response.status_code == 400:
-        return "That IP address was not bound. No changes made"
-    elif remove_ip_response.status_code == 401:
-        return "Failed to authenticate. Contact admins"
-    
-    return 'Successfully unbound IP'
-
-def bind_ip(author_id, ip_address):
-    data = json.dumps({'ip_address': ip_address})
-    update_ip_response = requests.post(
-        f'{api_url}users/{author_id}/ip/',
-        data = data,
-        headers = generate_headers(data)
-    )
-    if update_ip_response.status_code == 404:
-        return "You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`"
-    elif update_ip_response.status_code == 400:
-        return 'Please input a valid IP address. Make sure this is an IPV4 address. Retry the `.bindip` command'
-    elif update_ip_response.status_code == 401:
-        return "Failed to authenticate. Contact admins"
-
-    return 'Successfully bound IP'
-
-def get_overview(author_id):
-    user_info_response = requests.get(f'{api_url}users/{author_id}/', headers=generate_headers())
-    if user_info_response.status_code == 404:
-        return "You haven't registered in our database yet. Please register by setting a billing email with the command `.setbillingemail`"
-    elif user_info_response.status_code == 500:
-        return 'Error fetching user. Please contact admins about this issue'
-    
-    user_info = json.loads(user_info_response.text)
-    user_info_string = "```User Overview:\n" \
-                        f"Billing Email: {user_info['billing_email']}\n" \
-                        f"Bound IPs: {', '.join(user_info['binds'])}\n" \
-                        f"Remaining Data: {user_info['data_string']}\n" 
-    if user_info['data_expiry'] == "N/A":
-        user_info_string += "Data Expiration: N/A ```"
-    else:
-        user_info_string += f'Data Expiration: {datetime.fromtimestamp(int(user_info["data_expiry"])).strftime("%Y-%m-%d")}```'
-
-    return user_info_string
-
-def generate_headers(request_body = None):
-    timestamp = int(time.time())
-    if request_body == None:
-        signature = hmac.new(
-            PROXY_API_TOKEN.encode('utf-8'), 
-            msg = str(timestamp).encode('utf-8'), 
-            digestmod = sha256
-        ).hexdigest()
-    else:     
-        signature = hmac.new(
-            PROXY_API_TOKEN.encode('utf-8'), 
-            msg = ("%d.%s" % (timestamp, request_body)).encode('utf-8'), 
-            digestmod = sha256
-        ).hexdigest()
-
-    return {'timestamp': str(timestamp), 'signature': signature, 'Content-Type': 'application/json',}
-
-client.run(TOKEN)
+client.run(DISCORD_TOKEN)
