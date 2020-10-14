@@ -68,20 +68,7 @@ async def on_message(message):
         except ValueError:
             response_message = "Input a valid integer as the proxy amount. The proper format is `.generate proxy_pool proxy_type, region, proxy_count`"
     elif message.channel.id == ADMIN_BOT_COMMANDS_ID:
-        if message_arguments[0] == '.status':
-            if message_arguments[1] == 'True':
-                status = True
-            elif message_arguments[1] == 'False':
-                status = False
-            else:
-                response_message = 'Input a valid status'
-                await message.channel.send(response_message)
-                return
-            await delete_previous_message(BOT_STATUS_CHANNEL_ID)
-            await send_bot_status(status)
-            await message.channel.send('Successfully changed status')
-            return
-        elif message_arguments[0] == '.purge':
+        if message_arguments[0] == '.purge':
             try:
                 await purge_users(users = message_arguments[1])
             except IndexError:
