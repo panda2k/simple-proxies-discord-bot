@@ -1,7 +1,5 @@
 import requests 
 import time
-import random
-import string
 from hashlib import sha256
 import hmac
 import json
