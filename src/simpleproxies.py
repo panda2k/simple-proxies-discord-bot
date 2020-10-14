@@ -41,36 +41,6 @@ def set_billing_email(discord_id: str, billing_email: str):
 
     return update_billing_address_response
 
-def bind_ip(discord_id: str, ip_address: str):
-    data = {
-        'ip_address': ip_address
-    }
-
-    headers = generate_headers(API_KEY, request_body = data)
-
-    bind_ip_response = requests.post(
-        f'{BASE_API_URL}/users/{discord_id}/ip/',
-        json = data,
-        headers = headers
-    )
-    
-    return bind_ip_response
-
-def unbind_ip(discord_id: str, ip_address: str):
-    data = {
-        'ip_address': ip_address
-    }
-
-    headers = generate_headers(API_KEY, request_body = data)
-
-    bind_ip_response = requests.delete(
-        f'{BASE_API_URL}/users/{discord_id}/ip/',
-        json = data,
-        headers = headers
-    )
-    
-    return bind_ip_response    
-
 def get_user_overview(discord_id: str):
     headers = generate_headers(API_KEY)
 
