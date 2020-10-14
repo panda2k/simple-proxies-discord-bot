@@ -44,10 +44,6 @@ async def on_message(message):
 
     if message_arguments[0] == '.setbillingemail':
         response_message = set_billing_email(author_id, billing_email = message_arguments[1])
-    elif message_arguments[0] == '.bindip':
-        response_message = bind_ip(author_id, ip_address = message_arguments[1])
-    elif message_arguments[0] == '.unbindip':
-        response_message = unbind_ip(author_id, ip_address = message_arguments[1])
     elif message_arguments[0] == '.overview':
         response_message = get_overview(author_id)
     elif message_arguments[0] == '.purchase':
@@ -133,22 +129,6 @@ def set_billing_email(author_id: int, billing_email: str):
     
     return 'Successfully updated billing email'
 
-def unbind_ip(author_id: int, ip_address: str):
-    remove_ip_response = simpleproxies.unbind_ip(author_id, ip_address)
-
-    if remove_ip_response.status_code != 200:
-        return process_bad_response(remove_ip_response)
-    
-    return 'Successfully unbound IP'
-
-def bind_ip(author_id: int, ip_address: str):
-    update_ip_response = simpleproxies.bind_ip(author_id, ip_address)
-
-    if update_ip_response.status_code != 200:
-        return process_bad_response(update_ip_response)
-
-    return 'Successfully bound IP'
-
 def get_overview(author_id: int):
     user_info_response = simpleproxies.get_user_overview(author_id)
     if user_info_response.status_code != 200:
@@ -157,18 +137,10 @@ def get_overview(author_id: int):
     user_info = json.loads(user_info_response.text)
     user_info_string = "```User Overview:\n" \
                         f"Billing Email: {user_info['billing_email']}\n\n" \
-                        f"Premium Plan Info\n" \
-                        f"Bound IPs: {', '.join(user_info['binds'])}\n" \
-                        f"Remaining Data: {user_info['proxiware_data_string']}\n" \
-                        "Expiry Date: PREMIUM_EXPIRY\n\n" \
                         f"Star Plan Info\n" \
                         f"Data Remaining: {user_info['oxylabs_data_string']}\n" \
                         "Expiry Date: STAR_EXPIRY```"
-    if user_info['proxiware_data_expiry']:
-        user_info_string = user_info_string.replace('PREMIUM_EXPIRY', datetime.fromtimestamp(int(user_info["proxiware_data_expiry"])).strftime("%Y-%m-%d"))
-    else:
-        user_info_string.replace('PREMIUM_EXPIRY', 'N/A')
-    
+
     if user_info['oxylabs_data_expiry']:
         user_info_string = user_info_string.replace('STAR_EXPIRY', user_info['oxylabs_data_expiry'])
     else:
@@ -186,15 +158,7 @@ async def on_member_join(member):
     channel = client.get_channel(MEMBER_JOIN_LOG_ID)
     await channel.send(str(member.id) + ' just joined.')
 
-async def delete_previous_message(channel_id):
-    channel = client.get_channel(channel_id)
-    try:
-        last_message = await channel.fetch_message(channel.last_message_id)
-        await last_message.delete()
-    except discord.errors.NotFound:
-        return
-
-async def purge_users(users = None):
+async def purge_users(users = None): # TODO fix
     inactive_members = []
     bot_command_channel = client.get_channel(ADMIN_BOT_COMMANDS_ID)
 
@@ -264,20 +228,6 @@ async def purge_users(users = None):
                             await bot_command_channel.send('Unknown response. Code: ' + str(delete_member_response.status_code))                       
                 elif str(reaction.emoji) == '\U0000274C':
                     await bot_command_channel.send('Cancelling purge')
-
-async def send_bot_status(bot_status):
-    channel = client.get_channel(BOT_STATUS_CHANNEL_ID)
-    status_embed = discord.Embed(
-        title = 'Simple Proxies Bot Status',
-        description = "View this message to see if the bot is operational. Although the bot is online, it might be undergoing maintenance. If the bot is ever giving errors, check here to make sure the bot isn't under maintenance.", 
-    )
-    if bot_status == True:
-        status_embed.description += "\n\n**BOT STATUS**: :white_check_mark:"
-        status_embed.colour = int('5dcf48', 16)
-    elif bot_status == False:
-        status_embed.description += "\n\n**BOT STATUS**: :x:"
-        status_embed.colour = int('cf4d48', 16)
-    await channel.send(embed = status_embed)
 
 # HELPER FUNCTIONS
 def process_bad_response(response):
